@@ -1,0 +1,30 @@
+{
+  "name": "orkagent",
+  "version": "0.1.0",
+  "description": "Agent command center CLI/TUI",
+  "type": "module",
+  "bin": {
+    "orkagent": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.36.3",
+    "commander": "^12.1.0",
+    "ink": "^5.1.0",
+    "openai": "^4.77.0",
+    "react": "^18.3.1",
+    "yaml": "^2.7.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "@types/react": "^18.3.18",
+    "ink-testing-library": "^3.0.0",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}
