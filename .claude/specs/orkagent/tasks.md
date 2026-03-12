@@ -576,53 +576,64 @@ Verified: Has it been tested end-to-end as a user would interact with it?
 
 ## Dependency Map
 
+> Note: This diagram shows primary dependency chains. Each task's full
+> dependency list is authoritative and may include additional cross-phase
+> edges not shown here (e.g., T-31 also depends on T-8, T-9, T-10;
+> T-20 also depends on T-9, T-18; T-36 also depends on T-8, T-9).
+
 ```
 T-1 (scaffolding)
   └─> T-2 (types)
         ├─> T-3 (config)
-        │     ├─> T-8 (runner)
-        │     │     ├─> T-9 (orchestrator)
-        │     │     │     └─> T-14 (CLI entry) ──> T-15 (wire TUI) ──> T-16 (P1 tests)
-        │     │     └─> T-18 (dep graph)
-        │     └─> T-9
-        ├─> T-4 (anthropic adapter) ──> T-9
-        ├─> T-5 (openai adapter)    ──> T-9
-        ├─> T-6 (ollama adapter)    ──> T-9
-        ├─> T-7 (store)
-        │     ├─> T-8
-        │     ├─> T-10 (App.tsx)
-        │     │     ├─> T-11 (AgentPane)
-        │     │     ├─> T-12 (StatusBar)
-        │     │     └─> T-13 (InputBar)
-        │     └─> T-27 (permission guard)
-        └─> T-17 (event bus)
-              ├─> T-18
-              ├─> T-19 (watches)
-              │     ├─> T-20 (context_from)
-              │     └─> T-21 (wire event bus) ──> T-22 (P2 tests)
-              └─> T-22
-
-T-23 (tool registry)
-  ├─> T-24 (file tools)
-  ├─> T-25 (shell tool)
-  ├─> T-26 (web search)
-  ├─> T-27 (permission guard)
-  │     └─> T-28 (approval prompt)
-  │           └─> T-30 (cost guardrails)
-  └─> T-29 (SSH runner)
-        └─> T-31 (wire tools) ──> T-32 (P3 tests)
-
-T-33 (plugin manifest)
-  └─> T-34 (plugin loader)
-        ├─> T-35 (sandbox)
-        │     └─> T-36 (hooks)
-        │           └─> T-37 (wire plugins) ──> T-38 (P4 tests)
+        │     ├─> T-8 (runner) ─────────────────────────┐
+        │     │     ├─> T-9 (orchestrator) ─────────────┤
+        │     │     │     └─> T-14 (CLI entry)          │
+        │     │     │           └─> T-15 (wire TUI)     │
+        │     │     │                 └─> T-16 (P1 tests)│
+        │     │     └─> T-18 (dep graph)                │
+        │     └─> T-9                                   │
+        ├─> T-4 (anthropic adapter) ──> T-9             │
+        ├─> T-5 (openai adapter)    ──> T-9             │
+        ├─> T-6 (ollama adapter)    ──> T-9             │
+        ├─> T-7 (store)                                 │
+        │     ├─> T-8                                   │
+        │     ├─> T-10 (App.tsx)                        │
+        │     │     ├─> T-11 (AgentPane)                │
+        │     │     ├─> T-12 (StatusBar)                │
+        │     │     └─> T-13 (InputBar)                 │
+        │     └─> T-27 (permission guard)               │
+        └─> T-17 (event bus)                            │
+              ├─> T-18                                  │
+              ├─> T-19 (watches)                        │
+              │     ├─> T-20 (context_from) <── T-9,T-18│
+              │     └─> T-21 (wire event bus)           │
+              │           └─> T-22 (P2 tests)           │
+              └─> T-22                                  │
+                                                        │
+T-23 (tool registry)                                    │
+  ├─> T-24 (file tools)                                │
+  ├─> T-25 (shell tool)                                │
+  ├─> T-26 (web search)                                │
+  ├─> T-27 (permission guard)                          │
+  │     └─> T-28 (approval prompt)                     │
+  │           └─> T-30 (cost guardrails) <── T-8,T-9   │
+  └─> T-29 (SSH runner)                                │
+        └─> T-31 (wire tools) <── T-8,T-9,T-10         │
+              └─> T-32 (P3 tests)                      │
+                                                        │
+T-33 (plugin manifest)                                  │
+  └─> T-34 (plugin loader)                             │
+        ├─> T-35 (sandbox) <── T-27                    │
+        │     └─> T-36 (hooks) <── T-8,T-9 ───────────┘
+        │           └─> T-37 (wire plugins) <── T-9,T-12
+        │                 └─> T-38 (P4 tests)
         └─> T-36
 
 T-39 (template manifest)
-  ├─> T-40 (save)
+  ├─> T-40 (save) <── T-3
   │     ├─> T-41 (publish)
   │     └─> T-42 (fork)
   ├─> T-43 (search)
-  └─> T-44 (wire CLI) ──> T-45 (P5 tests)
+  └─> T-44 (wire CLI) <── T-14
+        └─> T-45 (P5 tests)
 ```

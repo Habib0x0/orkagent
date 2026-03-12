@@ -620,8 +620,10 @@ Grows to include `eventbus.ts`, `tools/`, `plugins/`, `templates/` in later phas
 | `zod` | Config and manifest validation | ^3.x |
 | `yaml` | YAML parsing | ^2.x |
 | `ssh2` | SSH remote operations (Phase 3) | ^1.x |
+| `commander` | CLI command parsing and dispatch | ^12.x |
+| `simple-git` | Git operations for template publish (Phase 5) | ^3.x |
 
-No additional frameworks. Standard Node.js `EventEmitter` for the event bus. `commander` or `yargs` for CLI parsing (evaluate which is lighter).
+Standard Node.js `EventEmitter` for the event bus. `commander` was chosen over `yargs` for CLI parsing (lighter, fewer dependencies).
 
 ### Security Considerations
 

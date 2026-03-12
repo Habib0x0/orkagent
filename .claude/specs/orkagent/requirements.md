@@ -51,7 +51,7 @@ Delivery is phased: Core Foundation (P1), Agent Communication (P2), Tool Sandbox
    THE SYSTEM SHALL render each agent's streaming output in its own pane within the TUI, updating at 50-100ms batched intervals.
 
 2. WHEN the number of running agents exceeds the visible pane capacity
-   THE SYSTEM SHALL provide virtual scrolling so the user can navigate to off-screen agent panes without performance degradation.
+   THE SYSTEM SHALL provide virtual scrolling so the user can navigate to off-screen agent panes with no more than 16ms additional render latency per pane beyond the visible viewport.
 
 3. THE SYSTEM SHALL display a status bar showing each agent's state (running, idle, done, error), cumulative input/output token counts, and estimated cost in USD.
 
@@ -380,7 +380,7 @@ Delivery is phased: Core Foundation (P1), Agent Communication (P2), Tool Sandbox
 ### NFR-3: Memory Usage
 
 - THE SYSTEM SHALL NOT exceed 512 MB RSS with 10 concurrently active agents.
-- THE SYSTEM SHALL trim agent output buffers using a rolling window when memory limits are approached.
+- THE SYSTEM SHALL trim agent output buffers using a rolling window when the buffer exceeds 10,000 lines, evicting the oldest entries to stay within the 512 MB RSS target.
 
 ### NFR-4: Security
 
@@ -430,10 +430,10 @@ Delivery is phased: Core Foundation (P1), Agent Communication (P2), Tool Sandbox
 
 ## Open Questions
 
-- [ ] **Plugin security model**: Plugins run in the same Node.js process and have full access to the runtime. Should Phase 4 introduce a capability-based restriction (e.g., plugins declare required permissions in their manifest)?
-- [ ] **Watch event filtering**: Should `watches` trigger on all `StreamEvent` types, or should the config allow filtering (e.g., `watches: [{ agent: researcher, events: [done, tool_result] }]`)?
-- [ ] **SSH authentication**: Should orkagent support SSH agent forwarding in addition to explicit key paths? Should it read `~/.ssh/config` for host aliases?
-- [ ] **Session persistence format**: Should session files be JSON, SQLite, or a custom binary format? JSON is simplest but may be slow for large sessions.
+- [x] **Plugin security model**: Decided -- plugins run in-process with a `PluginSandbox` boundary. The sandbox wraps tool invokers (catching exceptions) and enforces a forbidden hook deny-list (e.g., `onPermissionChange`). Capability-based manifest permissions deferred to a future phase. See Assumption 6.
+- [x] **Watch event filtering**: Decided -- watches trigger on all `StreamEvent` types from the watched agent. Fine-grained event filtering deferred to a future phase; users can filter in their agent's system prompt.
+- [x] **SSH authentication**: Decided -- orkagent supports explicit key paths and SSH agent forwarding via `SSH_AUTH_SOCK`. Reading `~/.ssh/config` for host aliases is deferred to a future phase.
+- [x] **Session persistence format**: Decided -- JSON. Simplest to implement, human-readable for debugging. SQLite migration can be considered if performance becomes an issue with large sessions.
 
 ---
 
