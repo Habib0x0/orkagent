@@ -18,7 +18,7 @@ Verified: Has it been tested end-to-end as a user would interact with it?
 | Pending | 0 |
 | In Progress | 0 |
 | Completed | 45 |
-| Wired | 0 |
+| Wired | 6 |
 | Verified | 45 |
 
 ---
