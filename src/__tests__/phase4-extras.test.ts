@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { HookRegistry } from '../hooks.js';
 import { ToolRegistry } from '../tools/registry.js';
+import { PluginSandbox } from '../plugins/sandbox.js';
 import { loadPlugins } from '../plugins/loader.js';
 import type { PluginModule } from '../plugins/loader.js';
 import type { Config } from '../config.js';
@@ -77,9 +78,10 @@ describe('Plugin tool invoker: exception behaviour', () => {
     const entry = toolRegistry.get('boom_tool');
     expect(entry).toBeDefined();
 
-    // The raw invoker is registered without wrapping -- caller must handle errors.
-    // This documents the current contract: tool throws == unhandled rejection.
-    await expect(entry!.invoker({})).rejects.toThrow('tool exploded');
+    // The sandbox wraps tool invokers -- exceptions are caught and returned as error results.
+    const result = await entry!.invoker({});
+    expect(result.isError).toBe(true);
+    expect(result.output).toContain('tool exploded');
   });
 
   it('tool invoker returning isError:true is treated as a non-throwing error result', async () => {
@@ -238,5 +240,69 @@ describe('Provider plugin registration via loadPlugins', () => {
 
     expect(result.loaded).toHaveLength(2);
     expect(result.loaded.map(p => p.name)).toEqual(['provider-alpha', 'provider-beta']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PluginSandbox direct tests
+// ---------------------------------------------------------------------------
+
+describe('PluginSandbox', () => {
+  it('rejects forbidden hook name and logs security warning', () => {
+    const hookRegistry = new HookRegistry();
+    const sandbox = new PluginSandbox('evil-plugin', new ToolRegistry(), hookRegistry);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // force the forbidden name through by casting
+    const accepted = sandbox.registerHook('onPermissionChange' as any, () => {});
+    expect(accepted).toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/SECURITY.*onPermissionChange.*rejected/),
+    );
+
+    warnSpy.mockRestore();
+  });
+
+  it('accepts valid hook names', () => {
+    const hookRegistry = new HookRegistry();
+    const sandbox = new PluginSandbox('good-plugin', new ToolRegistry(), hookRegistry);
+
+    const accepted = sandbox.registerHook('onAgentStart', () => {});
+    expect(accepted).toBe(true);
+  });
+
+  it('wraps tool invokers to catch exceptions', async () => {
+    const toolRegistry = new ToolRegistry();
+    const sandbox = new PluginSandbox('crashy-plugin', toolRegistry, new HookRegistry());
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    sandbox.registerTool(
+      { name: 'crashy', description: 'throws', inputSchema: {} },
+      () => { throw new Error('boom'); },
+    );
+
+    const entry = toolRegistry.get('crashy');
+    expect(entry).toBeDefined();
+
+    const result = await entry!.invoker({});
+    expect(result.isError).toBe(true);
+    expect(result.output).toContain('boom');
+
+    errorSpy.mockRestore();
+  });
+
+  it('passes through successful tool results unchanged', async () => {
+    const toolRegistry = new ToolRegistry();
+    const sandbox = new PluginSandbox('ok-plugin', toolRegistry, new HookRegistry());
+
+    sandbox.registerTool(
+      { name: 'ok_tool', description: 'works', inputSchema: {} },
+      async () => ({ id: 'r1', output: 'success', isError: false }),
+    );
+
+    const entry = toolRegistry.get('ok_tool');
+    const result = await entry!.invoker({});
+    expect(result.output).toBe('success');
+    expect(result.isError).toBe(false);
   });
 });

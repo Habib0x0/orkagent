@@ -4,6 +4,7 @@
 import type { Config } from '../config.js';
 import type { ToolRegistry } from '../tools/registry.js';
 import type { HookRegistry, HookName, HookMap, HookHandler } from '../hooks.js';
+import { PluginSandbox } from './sandbox.js';
 
 export interface LoadedPlugin {
   name: string;
@@ -43,10 +44,11 @@ export async function loadPlugins(
     try {
       const entryPath = ref.path ?? ref.name;
       const mod = (await moduleLoader(entryPath)) as PluginModule;
+      const sandbox = new PluginSandbox(ref.name, toolRegistry, hookRegistry);
 
       if (mod.tools) {
         for (const { definition, invoker } of mod.tools) {
-          toolRegistry.register(definition, invoker);
+          sandbox.registerTool(definition, invoker);
         }
       }
 
@@ -54,8 +56,7 @@ export async function loadPlugins(
         for (const [hookName, handler] of Object.entries(mod.hooks) as Array<
           [HookName, HookHandler<HookMap[HookName]>]
         >) {
-          // cast needed because Object.entries loses the key/value correlation
-          hookRegistry.register(hookName, handler as HookHandler<HookMap[typeof hookName]>);
+          sandbox.registerHook(hookName, handler as HookHandler<HookMap[typeof hookName]>);
         }
       }
 
