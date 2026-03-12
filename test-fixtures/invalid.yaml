@@ -1,0 +1,7 @@
+version: 1
+
+agents:
+  bad-agent:
+    # provider is missing -- will fail Zod validation
+    model: gpt-4o
+    system: An agent without a provider.

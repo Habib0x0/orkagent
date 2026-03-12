@@ -1,0 +1,29 @@
+version: 1
+
+agents:
+  researcher:
+    provider: ollama
+    model: llama3.2
+    system: You are a research assistant.
+    max_restarts: 5
+
+  coder:
+    provider: ollama
+    model: codellama
+    watches:
+      - researcher
+    depends_on:
+      - researcher
+    tools:
+      - file_read
+      - file_write
+    tools_mode: unified
+
+teams:
+  default:
+    agents:
+      - researcher
+      - coder
+
+session:
+  max_cost: 10.0

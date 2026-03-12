@@ -1,0 +1,14 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ApprovalPrompt > snapshot: single pending approval 1`] = `
+"╔══════════════════════════════════════════════════════════════════════════════════════════════════╗
+║ Tool approval required                                                                           ║
+║                                                                                                  ║
+║ agent: agent-coder  tool: shell                                                                  ║
+║                                                                                                  ║
+║ rm -rf /tmp/test                                                                                 ║
+║                                                                                                  ║
+║ [y] Approve  [n] Deny  [a] Approve + remember                                                    ║
+╚══════════════════════════════════════════════════════════════════════════════════════════════════╝
+"
+`;
