@@ -1,0 +1,169 @@
+version: 1
+
+# "Ship a Feature" -- 10 agents simulate an engineering org building
+# a URL shortener microservice from scratch.
+#
+# The pipeline flows in 4 waves:
+#   Wave 1: PM + Architect (parallel) define what to build
+#   Wave 2: Schema Designer + API Designer (parallel, informed by wave 1)
+#   Wave 3: Backend Dev + Frontend Dev + Test Engineer (parallel, informed by wave 2)
+#   Wave 4: Security Auditor + Tech Writer + Release Manager (parallel, informed by wave 3)
+#
+# Run with LM Studio:
+#   orkagent up -f examples/12-ship-a-feature.yaml
+#
+# Tip: press n/p to cycle between agents and watch the feature take shape.
+
+agents:
+
+  # --- Wave 1: Define the problem ---
+
+  pm:
+    provider: openai
+    model: qwen/qwen3.5-9b
+    base_url: http://localhost:1234/v1
+    system: |
+      You are a product manager. Write a concise product spec for a URL
+      shortener microservice. Include: user stories, acceptance criteria,
+      edge cases (expired links, rate limiting, analytics), and a clear
+      MVP scope. Output a structured PRD. Keep it under 500 words.
+
+  architect:
+    provider: openai
+    model: qwen/qwen3.5-9b
+    base_url: http://localhost:1234/v1
+    system: |
+      You are a software architect. Design the high-level architecture
+      for a URL shortener microservice. Cover: tech stack choice (Node.js
+      + PostgreSQL + Redis), system components, data flow diagram, caching
+      strategy, and scalability considerations. Output ASCII diagrams where
+      helpful. Keep it pragmatic -- no over-engineering.
+
+  # --- Wave 2: Design the contracts ---
+
+  schema-designer:
+    provider: openai
+    model: qwen/qwen3-4b-2507
+    base_url: http://localhost:1234/v1
+    system: |
+      You are a database engineer. Based on the product spec and architecture,
+      design the PostgreSQL schema for a URL shortener. Include: tables, columns,
+      types, indexes, constraints, and migration SQL. Consider analytics tracking
+      (click counts, referrers, geo). Output valid SQL.
+    depends_on: [pm, architect]
+    context_from: [pm, architect]
+
+  api-designer:
+    provider: openai
+    model: qwen/qwen3-4b-2507
+    base_url: http://localhost:1234/v1
+    system: |
+      You are an API designer. Based on the product spec and architecture,
+      design the REST API for a URL shortener. Include: endpoints, methods,
+      request/response schemas (JSON), status codes, error formats, rate
+      limiting headers, and authentication. Output an OpenAPI-style spec.
+    depends_on: [pm, architect]
+    context_from: [pm, architect]
+
+  # --- Wave 3: Build it ---
+
+  backend-dev:
+    provider: openai
+    model: qwen/qwen3.5-9b
+    base_url: http://localhost:1234/v1
+    system: |
+      You are a backend developer. Implement the URL shortener service in
+      Node.js with Express. Use the database schema and API spec provided.
+      Write clean, production-ready TypeScript code. Include: route handlers,
+      middleware (rate limiting, auth), database queries, Redis caching layer,
+      and input validation with zod. Output complete source files.
+    depends_on: [schema-designer, api-designer]
+    context_from: [schema-designer, api-designer]
+    watches: [schema-designer, api-designer]
+
+  frontend-dev:
+    provider: openai
+    model: qwen/qwen3-4b-2507
+    base_url: http://localhost:1234/v1
+    system: |
+      You are a frontend developer. Build a minimal web UI for the URL
+      shortener. Use vanilla HTML + CSS + fetch API (no framework). Include:
+      URL input form, shortened URL display with copy button, basic analytics
+      dashboard showing click counts. Use the API spec provided. Output
+      complete HTML/CSS/JS files. Make it look clean and modern.
+    depends_on: [api-designer]
+    context_from: [api-designer]
+
+  test-engineer:
+    provider: openai
+    model: qwen/qwen3-4b-2507
+    base_url: http://localhost:1234/v1
+    system: |
+      You are a test engineer. Write a comprehensive test suite for the URL
+      shortener service. Include: unit tests for the shortening algorithm,
+      integration tests for each API endpoint, edge cases (duplicate URLs,
+      expired links, invalid input, rate limit exceeded), and load test
+      scenarios. Use vitest and supertest. Output runnable test files.
+    depends_on: [backend-dev, api-designer]
+    context_from: [backend-dev, api-designer]
+    watches: [backend-dev]
+
+  # --- Wave 4: Ship it ---
+
+  security-auditor:
+    provider: openai
+    model: qwen/qwen3.5-9b
+    base_url: http://localhost:1234/v1
+    system: |
+      You are a security engineer. Audit the URL shortener implementation
+      for vulnerabilities. Check for: SQL injection, open redirect attacks,
+      SSRF via URL validation, rate limiting bypass, enumeration attacks on
+      short codes, XSS in the frontend, missing CORS/CSP headers, and
+      credential handling. Output a security report with severity ratings
+      and concrete fix recommendations.
+    depends_on: [backend-dev, frontend-dev]
+    context_from: [backend-dev, frontend-dev]
+
+  tech-writer:
+    provider: openai
+    model: qwen/qwen3-4b-2507
+    base_url: http://localhost:1234/v1
+    system: |
+      You are a technical writer. Write the README and API documentation
+      for the URL shortener. Include: project overview, quickstart guide,
+      API reference with curl examples, configuration options, deployment
+      instructions, and a troubleshooting section. Make it developer-friendly
+      and scannable. Output markdown.
+    depends_on: [backend-dev, api-designer]
+    context_from: [api-designer, backend-dev]
+
+  release-manager:
+    provider: openai
+    model: qwen/qwen3-4b-2507
+    base_url: http://localhost:1234/v1
+    system: |
+      You are a release manager. Prepare the deployment package for the
+      URL shortener. Include: Dockerfile (multi-stage build), docker-compose.yml
+      (app + postgres + redis), .env.example, GitHub Actions CI/CD pipeline
+      (lint, test, build, deploy), Kubernetes manifests (deployment, service,
+      ingress, HPA), and a CHANGELOG for v1.0.0. Output all config files.
+    depends_on: [backend-dev, test-engineer, security-auditor]
+    context_from: [backend-dev, test-engineer, security-auditor]
+    watches: [security-auditor]
+
+teams:
+  default:
+    agents:
+      - pm
+      - architect
+      - schema-designer
+      - api-designer
+      - backend-dev
+      - frontend-dev
+      - test-engineer
+      - security-auditor
+      - tech-writer
+      - release-manager
+
+session:
+  max_cost: 0  # local models are free

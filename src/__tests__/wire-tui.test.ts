@@ -51,7 +51,7 @@ describe('App wiring', () => {
       }),
     );
 
-    expect(lastFrame()).toContain('[run]');
+    expect(lastFrame()).toContain('running');
   });
 
   it('renders all agents present in store', () => {
@@ -109,7 +109,7 @@ describe('App wiring', () => {
     expect(onSendMessage).toHaveBeenCalledWith('a1', 'hello from user');
   });
 
-  it('renders focused layout and InputBar prompt when store has focused agent', () => {
+  it('renders agent pane in tmux-style layout (setFocusedAgent is a no-op for layout)', () => {
     store.setFocusedAgent('a1');
 
     const { lastFrame } = render(
@@ -120,8 +120,8 @@ describe('App wiring', () => {
       }),
     );
 
-    // focused layout shows the InputBar with agent name as prompt
-    expect(lastFrame()).toContain('[worker]');
+    // tmux-style: always shows active agent pane with name in header
+    expect(lastFrame()).toContain('worker');
   });
 
   it('approval prompt renders when pendingApprovals exist in store state', () => {
@@ -207,7 +207,7 @@ describe('App store change subscription', () => {
       }),
     );
 
-    expect(lastFrame()).toContain('[err]');
+    expect(lastFrame()).toContain('error');
 
     store.destroy();
     vi.useRealTimers();
@@ -234,8 +234,8 @@ describe('App store change subscription', () => {
       React.createElement(App, { store: storeDone, onRestart: vi.fn(), onStop: vi.fn() }),
     );
 
-    expect(frameIdle()).toContain('[idle]');
-    expect(frameDone()).toContain('[done]');
+    expect(frameIdle()).toContain('idle');
+    expect(frameDone()).toContain('done');
 
     storeIdle.destroy();
     storeDone.destroy();

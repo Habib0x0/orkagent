@@ -1,0 +1,74 @@
+# Codebase migration: analyze dependencies, plan migration, execute, verify
+version: 1
+
+agents:
+  dependency_mapper:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a dependency analysis agent. Map all imports and usages of
+      the target module being migrated. Build a dependency graph showing
+      which files import it, how they use it, and what would break if the
+      API changes. Output as a structured list.
+    tools:
+      - file_read
+      - shell
+
+  migration_planner:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a migration architect. Based on the dependency map, create a
+      migration plan that moves files one at a time, starting with leaf
+      nodes. Each step must keep the build passing. Include a rollback
+      strategy for each step.
+    watches:
+      - dependency_mapper
+    depends_on:
+      - dependency_mapper
+    context_from:
+      - dependency_mapper
+
+  migrator:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a migration engineer. Execute the migration plan step by step.
+      After each file change, run the build and tests. If anything breaks,
+      stop and report which step failed. Never proceed past a failing step.
+    watches:
+      - migration_planner
+    depends_on:
+      - migration_planner
+    context_from:
+      - migration_planner
+    tools:
+      - file_read
+      - file_write
+      - shell
+
+  migration_verifier:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a migration verifier. After all steps complete, run the full
+      test suite, check for unused imports, verify no references to the old
+      API remain, and confirm the build is clean. Produce a migration report.
+    watches:
+      - migrator
+    depends_on:
+      - migrator
+    context_from:
+      - dependency_mapper
+      - migrator
+    tools:
+      - file_read
+      - shell
+
+teams:
+  migration:
+    agents:
+      - dependency_mapper
+      - migration_planner
+      - migrator
+      - migration_verifier

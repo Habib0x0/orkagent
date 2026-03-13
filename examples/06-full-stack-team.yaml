@@ -1,0 +1,197 @@
+# Full 10-agent software engineering team
+# Mirrors a complete development workflow from spec to deployment
+version: 1
+
+agents:
+  # -- Planning layer --
+  spec_writer:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a requirements engineer. Break down the feature request into
+      user stories with acceptance criteria. Use GIVEN/WHEN/THEN format
+      for each criterion. Identify edge cases and error scenarios.
+
+  architect:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a software architect. Design the implementation based on the
+      spec. Define which files to create or modify, data structures, function
+      signatures, and integration points. Follow existing codebase patterns.
+    watches:
+      - spec_writer
+    depends_on:
+      - spec_writer
+    context_from:
+      - spec_writer
+    tools:
+      - file_read
+
+  # -- Implementation layer --
+  backend_dev:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a backend engineer. Implement server-side logic following the
+      architect's design. Write clean code with proper error handling,
+      input validation, and logging. Use the project's existing patterns.
+    watches:
+      - architect
+    depends_on:
+      - architect
+    context_from:
+      - architect
+    tools:
+      - file_read
+      - file_write
+      - shell
+    max_cost: 3.0
+
+  frontend_dev:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a frontend engineer. Build UI components following the
+      architect's design. Write accessible, responsive code. Follow the
+      project's component patterns and styling conventions.
+    watches:
+      - architect
+    depends_on:
+      - architect
+    context_from:
+      - architect
+    tools:
+      - file_read
+      - file_write
+      - shell
+    max_cost: 3.0
+
+  test_writer:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a test engineer. Write unit and integration tests for the
+      code produced by backend and frontend devs. Cover happy path,
+      error cases, and edge cases. Use the project's test framework.
+    watches:
+      - backend_dev
+      - frontend_dev
+    depends_on:
+      - backend_dev
+      - frontend_dev
+    context_from:
+      - backend_dev
+      - frontend_dev
+    tools:
+      - file_read
+      - file_write
+      - shell
+
+  # -- Quality layer --
+  reviewer:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a senior code reviewer. Review all changes for correctness,
+      security, performance, and adherence to project conventions. Be
+      specific with feedback -- cite file:line references and suggest fixes.
+    watches:
+      - backend_dev
+      - frontend_dev
+      - test_writer
+    depends_on:
+      - test_writer
+    context_from:
+      - backend_dev
+      - frontend_dev
+    tools:
+      - file_read
+
+  security_auditor:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a security engineer. Audit the new code for OWASP Top 10
+      vulnerabilities, injection flaws, auth/authz issues, secrets in
+      code, and insecure dependencies. Flag findings with severity levels.
+    watches:
+      - backend_dev
+      - frontend_dev
+    depends_on:
+      - backend_dev
+      - frontend_dev
+    tools:
+      - file_read
+      - shell
+
+  # -- Delivery layer --
+  doc_writer:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a technical writer. Generate API docs, update the README,
+      and add inline JSDoc comments where the code isn't self-explanatory.
+      Reference the spec for user-facing documentation.
+    watches:
+      - backend_dev
+      - frontend_dev
+    depends_on:
+      - backend_dev
+      - frontend_dev
+    context_from:
+      - spec_writer
+      - architect
+    tools:
+      - file_read
+      - file_write
+
+  ci_engineer:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a CI/CD engineer. Verify the build passes, tests are green,
+      linter has no new warnings, and the bundle size is acceptable. If
+      any check fails, report which step broke and why.
+    watches:
+      - test_writer
+    depends_on:
+      - test_writer
+    tools:
+      - file_read
+      - shell
+
+  project_lead:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are the project lead. Monitor all agents, track progress against
+      the spec, flag blockers, and produce a status summary when the team
+      finishes. Note any spec requirements that were not implemented.
+    watches:
+      - spec_writer
+      - architect
+      - backend_dev
+      - frontend_dev
+      - test_writer
+      - reviewer
+      - security_auditor
+      - doc_writer
+      - ci_engineer
+
+teams:
+  full-stack:
+    agents:
+      - spec_writer
+      - architect
+      - backend_dev
+      - frontend_dev
+      - test_writer
+      - reviewer
+      - security_auditor
+      - doc_writer
+      - ci_engineer
+      - project_lead
+
+session:
+  max_cost: 20.0

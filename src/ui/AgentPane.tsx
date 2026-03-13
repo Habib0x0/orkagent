@@ -1,7 +1,16 @@
 import React, { useMemo } from 'react';
 import { Box, Text, useStdout } from 'ink';
+import { Marked } from 'marked';
+import { markedTerminal } from 'marked-terminal';
 import type { AgentStoreEntry } from '../store.js';
 import type { AgentState } from '../providers/types.js';
+
+// set up marked with terminal renderer once
+const marked = new Marked(markedTerminal({
+  reflowText: true,
+  width: 120,
+  showSectionPrefix: false,
+}) as unknown as Record<string, unknown>);
 
 interface Props {
   entry: AgentStoreEntry;
@@ -9,74 +18,100 @@ interface Props {
   isExpanded: boolean;
 }
 
-interface StateDisplay {
-  color: string;
-  label: string;
-}
-
-function stateDisplay(state: AgentState): StateDisplay {
+function stateDisplay(state: AgentState): { color: string; label: string; icon: string } {
   switch (state) {
     case 'running':
     case 'starting':
-      return { color: 'green', label: '[run]' };
+      return { color: 'green', label: 'running', icon: '>' };
     case 'idle':
     case 'pending':
-      return { color: 'yellow', label: '[idle]' };
+      return { color: 'yellow', label: 'idle', icon: '-' };
     case 'paused':
-      return { color: 'cyan', label: '[wait]' };
+      return { color: 'cyan', label: 'paused', icon: '|' };
     case 'done':
-      return { color: 'gray', label: '[done]' };
+      return { color: 'gray', label: 'done', icon: '.' };
     case 'error':
-      return { color: 'red', label: '[err]' };
+      return { color: 'red', label: 'error', icon: '!' };
   }
 }
 
-function formatLine(line: string): React.ReactElement {
-  // tool call events get a prefix
-  if (line.startsWith('[TOOL: ')) {
-    return <Text color="magenta">{line}</Text>;
-  }
-  return <Text>{line}</Text>;
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(n);
 }
 
-export default function AgentPane({ entry, isFocused, isExpanded }: Props) {
+export default function AgentPane({ entry }: Props) {
   const { stdout } = useStdout();
-  // rough height estimate: terminal rows minus header/footer, or a fixed slice in grid mode
   const termRows = (stdout as { rows?: number }).rows ?? 24;
-  const paneHeight = isExpanded ? termRows - 4 : Math.max(6, Math.floor((termRows - 4) / 2));
+  // header(1) + border top/bottom(2) + status bar(1) = 4
+  const paneHeight = Math.max(termRows - 4, 4);
 
+  const isStreaming = entry.state === 'running' || entry.state === 'starting';
+
+  // render markdown to ANSI and split into lines for the visible window
   const visibleLines = useMemo(() => {
-    const buf = entry.outputBuffer;
-    if (buf.length <= paneHeight) return buf;
-    return buf.slice(buf.length - paneHeight);
+    const raw = entry.outputBuffer.join('\n');
+    if (!raw.trim()) return [];
+
+    let rendered: string;
+    try {
+      rendered = (marked.parse(raw) as string)
+        .replace(/\n+$/, ''); // trim trailing newlines
+    } catch {
+      rendered = raw;
+    }
+
+    const lines = rendered.split('\n');
+    if (lines.length <= paneHeight) return lines;
+    return lines.slice(lines.length - paneHeight);
   }, [entry.outputBuffer, paneHeight]);
 
-  const { color, label } = stateDisplay(entry.state);
-  const dim = !isFocused && !isExpanded;
+  const { color, label, icon } = stateDisplay(entry.state);
+  const totalTokens = entry.tokens.input + entry.tokens.output;
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="single"
-      borderColor={isFocused ? 'cyan' : 'gray'}
-      flexGrow={1}
-      overflow="hidden"
-    >
-      {/* header */}
+    <Box flexDirection="column" flexGrow={1}>
+      {/* header bar */}
       <Box flexDirection="row" paddingX={1}>
-        <Text bold={isFocused} dimColor={dim}>{entry.name}</Text>
-        <Text> </Text>
-        <Text color={color} dimColor={dim}>{label}</Text>
-        {entry.lastError ? <Text color="red" dimColor={dim}> {entry.lastError}</Text> : null}
+        <Text color={color} bold>{icon} </Text>
+        <Text bold color="white">{entry.name}</Text>
+        <Text color={color} dimColor> {label}</Text>
+        {isStreaming ? <Text color="green"> {getSpinner()}</Text> : null}
+        <Box flexGrow={1} />
+        {totalTokens > 0 ? (
+          <Text dimColor>{formatTokens(entry.tokens.input)}in {formatTokens(entry.tokens.output)}out</Text>
+        ) : null}
+        {entry.cost > 0 ? (
+          <Text dimColor> ${entry.cost.toFixed(4)}</Text>
+        ) : null}
       </Box>
-      {/* output area */}
-      <Box flexDirection="column" flexGrow={1} paddingX={1} overflow="hidden">
+      {/* main output area */}
+      <Box
+        flexDirection="column"
+        flexGrow={1}
+        borderStyle="round"
+        borderColor={isStreaming ? 'green' : 'gray'}
+        paddingX={1}
+      >
+        {visibleLines.length === 0 && !entry.lastError ? (
+          <Text dimColor>{isStreaming ? 'Waiting for response...' : 'No output yet'}</Text>
+        ) : null}
         {visibleLines.map((line, i) => (
-          <Box key={i}>
-            <Text dimColor={dim}>{formatLine(line).props.children}</Text>
-          </Box>
+          <Text key={i} wrap="wrap">{line}</Text>
         ))}
+        {entry.lastError ? (
+          <Box marginTop={1}>
+            <Text color="red">{entry.lastError}</Text>
+          </Box>
+        ) : null}
       </Box>
     </Box>
   );
+}
+
+function getSpinner(): string {
+  const frames = ['|', '/', '-', '\\'];
+  const idx = Math.floor(Date.now() / 120) % frames.length;
+  return frames[idx]!;
 }

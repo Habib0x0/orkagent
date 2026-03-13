@@ -7,6 +7,7 @@ import { z } from 'zod';
 export const AgentConfigSchema = z.object({
   provider: z.enum(['anthropic', 'openai', 'ollama']),
   model: z.string().min(1),
+  base_url: z.string().url().optional(),
   system: z.string().optional(),
   // Phase 2: inter-agent communication
   watches: z.array(z.string()).optional(),
@@ -183,7 +184,7 @@ export function loadConfig(filePath: string): Config {
   // Validate that required API keys exist as env vars
   for (const [agentName, agentConfig] of Object.entries(config.agents)) {
     const envVar = PROVIDER_ENV_VARS[agentConfig.provider];
-    if (envVar && !process.env[envVar]) {
+    if (envVar && !process.env[envVar] && !agentConfig.base_url) {
       throw new ConfigValidationError(
         `agent "${agentName}" requires ${envVar} to be set`,
         [{ path: `agents.${agentName}.provider`, expected: `env var ${envVar} to be set`, received: 'not set' }]

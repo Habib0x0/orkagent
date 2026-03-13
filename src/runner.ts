@@ -39,6 +39,8 @@ export class AgentRunner {
     if (config.system) {
       this.history.push({ role: 'system', content: config.system });
     }
+    // seed with a user message so providers that require one (e.g. LM Studio) work
+    this.history.push({ role: 'user', content: 'Begin.' });
   }
 
   /** Begin the conversation loop. Never throws. */
@@ -174,6 +176,7 @@ export class AgentRunner {
 
           case 'done': {
             // commit accumulated assistant message and execute tools
+            const hadToolCalls = pendingToolCalls.length > 0;
             await this.flushAssistantTurn(assistantText, pendingToolCalls);
             assistantText = '';
 
@@ -184,9 +187,20 @@ export class AgentRunner {
                 event.usage.outputTokens,
               );
             }
-            this.store.updateAgentState(this.agentId, 'idle');
+
+            // if the model made tool calls, continue the loop to process results
+            if (hadToolCalls) {
+              this.store.updateAgentState(this.agentId, 'running');
+              await this.hooks.invoke('onAgentDone', this.agentId);
+              this.eventBus?.publish(this.agentId, { ...event, agentId: this.agentId });
+              // continue with tool results in history
+              await this.doSend();
+              return;
+            }
+
+            // no tool calls -- agent completed its turn
+            this.store.updateAgentState(this.agentId, 'done');
             await this.hooks.invoke('onAgentDone', this.agentId);
-            // publish done event so watchers can react
             this.eventBus?.publish(this.agentId, { ...event, agentId: this.agentId });
             return;
           }
@@ -206,9 +220,9 @@ export class AgentRunner {
         }
       }
 
-      // stream ended without a done event -- treat as idle
+      // stream ended without a done event -- treat as done
       await this.flushAssistantTurn(assistantText, pendingToolCalls);
-      this.store.updateAgentState(this.agentId, 'idle');
+      this.store.updateAgentState(this.agentId, 'done');
     } catch (err) {
       // unexpected exception from provider
       const msg = err instanceof Error ? err.message : String(err);

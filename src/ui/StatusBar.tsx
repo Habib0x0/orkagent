@@ -5,57 +5,61 @@ import type { AgentState } from '../providers/types.js';
 
 interface Props {
   agents: AgentStoreEntry[];
+  activeIndex: number;
 }
 
-interface StateDisplay {
-  color: string;
-  label: string;
-}
-
-function stateDisplay(state: AgentState): StateDisplay {
+function stateColor(state: AgentState): string {
   switch (state) {
     case 'running':
     case 'starting':
-      return { color: 'green', label: '[run]' };
+      return 'green';
     case 'idle':
     case 'pending':
-      return { color: 'yellow', label: '[idle]' };
+      return 'yellow';
     case 'paused':
-      return { color: 'cyan', label: '[wait]' };
+      return 'cyan';
     case 'done':
-      return { color: 'gray', label: '[done]' };
+      return 'gray';
     case 'error':
-      return { color: 'red', label: '[err]' };
+      return 'red';
   }
 }
 
 function formatTokens(n: number): string {
-  return n.toLocaleString('en-US');
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(n);
 }
 
-function formatCost(cost: number): string {
-  return `$${cost.toFixed(4)}`;
-}
-
-export default function StatusBar({ agents }: Props) {
+export default function StatusBar({ agents, activeIndex }: Props) {
   const totalInput = agents.reduce((sum, a) => sum + a.tokens.input, 0);
   const totalOutput = agents.reduce((sum, a) => sum + a.tokens.output, 0);
   const totalCost = agents.reduce((sum, a) => sum + a.cost, 0);
 
   return (
-    <Box flexDirection="row" flexWrap="wrap">
+    <Box flexDirection="row" paddingX={1}>
       {agents.map((agent, i) => {
-        const { color, label } = stateDisplay(agent.state);
+        const color = stateColor(agent.state);
+        const isActive = i === activeIndex;
         return (
-          <Box key={agent.id} marginRight={1}>
-            <Text>{agent.name}</Text>
-            <Text color={color}>{label}</Text>
-            {i < agents.length - 1 ? <Text> </Text> : null}
-          </Box>
+          <React.Fragment key={agent.id}>
+            {i > 0 ? <Text dimColor> | </Text> : null}
+            <Text
+              bold={isActive}
+              inverse={isActive}
+              color={isActive ? 'white' : color}
+              backgroundColor={isActive ? 'blue' : undefined}
+            >
+              {isActive ? ` ${i + 1}:${agent.name} ` : `${i + 1}:${agent.name}`}
+            </Text>
+          </React.Fragment>
         );
       })}
       <Box flexGrow={1} />
-      <Text>in:{formatTokens(totalInput)} out:{formatTokens(totalOutput)} {formatCost(totalCost)}</Text>
+      <Text dimColor>
+        {formatTokens(totalInput)}in {formatTokens(totalOutput)}out ${totalCost.toFixed(4)}
+      </Text>
+      <Text dimColor> | n/p:switch i:msg ^b:cmd</Text>
     </Box>
   );
 }

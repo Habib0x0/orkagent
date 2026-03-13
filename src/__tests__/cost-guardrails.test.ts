@@ -81,7 +81,7 @@ class CostGuardrailOrchestrator {
 
       if (agentConfig.max_cost !== undefined && cost > agentConfig.max_cost) {
         const runner = this.runners.get(agentId);
-        if (runner && entry.state !== 'paused' && entry.state !== 'done') {
+        if (runner && entry.state !== 'paused') {
           runner.pause();
         }
       }
@@ -91,7 +91,7 @@ class CostGuardrailOrchestrator {
     if (sessionMaxCost !== undefined && sessionTotal > sessionMaxCost) {
       for (const [agentId, runner] of this.runners.entries()) {
         const entry = this.store.getAgent(agentId);
-        if (entry && entry.state !== 'paused' && entry.state !== 'done') {
+        if (entry && entry.state !== 'paused') {
           runner.pause();
         }
       }
@@ -206,8 +206,8 @@ describe('agent max_cost guardrail', () => {
     await runner.start();
     vi.advanceTimersByTime(100);
 
-    // ollama cost is 0 -- should remain idle, not paused
-    expect(store.getAgent(agentId)?.state).toBe('idle');
+    // ollama cost is 0 -- should remain done, not paused
+    expect(store.getAgent(agentId)?.state).toBe('done');
   });
 
   it('does not pause agent when no max_cost is configured', async () => {
@@ -234,7 +234,7 @@ describe('agent max_cost guardrail', () => {
     await runner.start();
     vi.advanceTimersByTime(100);
 
-    expect(store.getAgent(agentId)?.state).toBe('idle');
+    expect(store.getAgent(agentId)?.state).toBe('done');
   });
 
   it('sets agent state to paused (not done or error)', async () => {
@@ -354,8 +354,8 @@ describe('session max_cost guardrail', () => {
 
     vi.advanceTimersByTime(100);
 
-    expect(store.getAgent('alpha')?.state).toBe('idle');
-    expect(store.getAgent('beta')?.state).toBe('idle');
+    expect(store.getAgent('alpha')?.state).toBe('done');
+    expect(store.getAgent('beta')?.state).toBe('done');
   });
 
   it('session guardrail is not applied when session.max_cost is not configured', async () => {
@@ -379,7 +379,7 @@ describe('session max_cost guardrail', () => {
     await runner.start();
     vi.advanceTimersByTime(100);
 
-    expect(store.getAgent('alpha')?.state).toBe('idle');
+    expect(store.getAgent('alpha')?.state).toBe('done');
   });
 
   it('session cost is the sum of all agent costs', async () => {

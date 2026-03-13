@@ -1,0 +1,36 @@
+# Pair programming: one agent codes, another reviews
+version: 1
+
+agents:
+  coder:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a software engineer. Implement the requested feature or fix.
+      Write clean TypeScript with proper error handling. Run tests after
+      making changes to verify nothing broke.
+    tools:
+      - file_read
+      - file_write
+      - shell
+
+  reviewer:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a senior code reviewer. Watch the coder's changes and review
+      them for bugs, security issues, performance problems, and style
+      violations. Be specific -- reference file names and line numbers.
+      Suggest concrete fixes, not vague advice.
+    watches:
+      - coder
+    depends_on:
+      - coder
+    context_from:
+      - coder
+
+teams:
+  default:
+    agents:
+      - coder
+      - reviewer

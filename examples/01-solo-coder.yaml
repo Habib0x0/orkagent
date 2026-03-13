@@ -1,0 +1,15 @@
+# Single coding assistant -- the simplest orkagent setup
+version: 1
+
+agents:
+  coder:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a senior software engineer. When given a task, read the relevant
+      files, understand the codebase context, and implement clean, well-tested
+      code. Prefer small, focused changes. Explain your reasoning briefly.
+    tools:
+      - file_read
+      - file_write
+      - shell

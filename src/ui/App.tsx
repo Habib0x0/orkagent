@@ -25,100 +25,100 @@ export default function App({ store, onRestart, onStop, onSendMessage }: Props) 
   }, [store]);
 
   const agents = Object.values(appState.agents);
-  const layout = appState.layout;
-  const focusedId = appState.focusedAgentId;
 
-  // track focus index for grid navigation
-  const [focusIndex, setFocusIndex] = useState(0);
+  // current agent index -- always show one agent full-screen (tmux-style)
+  const [activeIndex, setActiveIndex] = useState(0);
 
-  // ctrl-b prefix state
+  // ctrl-b prefix for tmux-style commands
   const [ctrlBPending, setCtrlBPending] = useState(false);
 
-  const focusedEntry: AgentStoreEntry | undefined =
-    focusedId ? appState.agents[focusedId] : agents[focusIndex];
+  // input mode -- when true, keystrokes go to InputBar instead of navigation
+  const [inputMode, setInputMode] = useState(false);
 
-  const clampIndex = useCallback(
-    (idx: number) => Math.max(0, Math.min(idx, agents.length - 1)),
+  const clamp = useCallback(
+    (idx: number) => {
+      if (agents.length === 0) return 0;
+      return ((idx % agents.length) + agents.length) % agents.length;
+    },
     [agents.length],
   );
 
   useInput(
     useCallback(
       (input, key) => {
-        if (ctrlBPending) {
-          setCtrlBPending(false);
-          const target = layout === 'focused' ? focusedId : agents[focusIndex]?.id;
-          if (!target) return;
-
-          if (input === 'r') {
-            onRestart(target);
-          } else if (input === 'x') {
-            onStop(target);
+        // in input mode, only escape exits
+        if (inputMode) {
+          if (key.escape) {
+            setInputMode(false);
           }
           return;
         }
 
-        // detect ctrl-b
+        // ctrl-b prefix commands (tmux-style)
+        if (ctrlBPending) {
+          setCtrlBPending(false);
+          const target = agents[activeIndex]?.id;
+          if (!target) return;
+
+          switch (input) {
+            case 'r': onRestart(target); break;
+            case 'x': onStop(target); break;
+            case 'n': setActiveIndex((i) => clamp(i + 1)); break;
+            case 'p': setActiveIndex((i) => clamp(i - 1)); break;
+            case 's': {
+              // swap current agent with next
+              // (swap is visual only -- changes the agents array order in store)
+              break;
+            }
+          }
+          return;
+        }
+
+        // detect ctrl-b prefix
         if (input === 'b' && key.ctrl) {
           setCtrlBPending(true);
           return;
         }
 
-        if (layout === 'focused') {
-          if (key.escape) {
-            store.setFocusedAgent(null);
-          }
-          // in focused mode, other nav keys are consumed by InputBar
+        // navigation: next/previous agent
+        if (input === 'n' || key.rightArrow || (key.tab && !key.shift)) {
+          setActiveIndex((i) => clamp(i + 1));
+          return;
+        }
+        if (input === 'p' || key.leftArrow) {
+          setActiveIndex((i) => clamp(i - 1));
           return;
         }
 
-        // grid mode navigation
-        if (input === 'h' || key.leftArrow) {
-          setFocusIndex((i) => clampIndex(i - 1));
-          return;
-        }
-        if (input === 'l' || key.rightArrow) {
-          setFocusIndex((i) => clampIndex(i + 1));
-          return;
-        }
-        if (input === 'j' || key.downArrow) {
-          setFocusIndex((i) => clampIndex(i + 1));
-          return;
-        }
-        if (input === 'k' || key.upArrow) {
-          setFocusIndex((i) => clampIndex(i - 1));
-          return;
-        }
-
-        // 1-9 jump
+        // 1-9 jump to agent by index
         const digit = parseInt(input, 10);
         if (digit >= 1 && digit <= 9) {
-          setFocusIndex(clampIndex(digit - 1));
+          setActiveIndex(clamp(digit - 1));
           return;
         }
 
-        if (key.return) {
-          const target = agents[focusIndex];
-          if (target) {
-            store.setFocusedAgent(target.id);
-          }
+        // enter input mode to send a message
+        if (input === 'i' || key.return) {
+          setInputMode(true);
+          return;
         }
       },
-      [ctrlBPending, layout, focusedId, agents, focusIndex, clampIndex, store, onRestart, onStop],
+      [ctrlBPending, inputMode, agents, activeIndex, clamp, onRestart, onStop],
     ),
   );
 
   const handleInputSubmit = useCallback(
     (text: string) => {
-      if (!focusedId) return;
+      const target = agents[activeIndex];
+      if (!target) return;
       if (onSendMessage) {
-        onSendMessage(focusedId, text);
+        onSendMessage(target.id, text);
       } else {
-        // fallback when no orchestrator is wired (e.g. plain mode)
-        store.appendOutput(focusedId, `[user] ${text}`);
+        store.appendOutput(target.id, `[user] ${text}`);
       }
+      setInputMode(false);
     },
-    [focusedId, store, onSendMessage],
+    [agents, activeIndex, store, onSendMessage],
   );
 
   const handleApprove = useCallback(
@@ -131,8 +131,6 @@ export default function App({ store, onRestart, onStop, onSendMessage }: Props) 
     [store],
   );
 
-  // approve + add to allow list -- the guard instance is not directly accessible here,
-  // so we emit an event that the orchestrator layer can pick up
   const handleApproveRemember = useCallback(
     (id: string) => {
       const approval = appState.pendingApprovals.find((a) => a.id === id);
@@ -153,35 +151,20 @@ export default function App({ store, onRestart, onStop, onSendMessage }: Props) 
     />
   ) : null;
 
-  if (layout === 'focused' && focusedEntry) {
-    return (
-      <Box flexDirection="column" flexGrow={1}>
-        {approvalPrompt}
-        <Box flexGrow={1}>
-          <AgentPane entry={focusedEntry} isFocused={true} isExpanded={true} />
-        </Box>
-        <InputBar agentName={focusedEntry.name} onSubmit={handleInputSubmit} />
-        <StatusBar agents={agents} />
-      </Box>
-    );
-  }
+  const activeAgent = agents[activeIndex];
 
-  // grid layout
   return (
     <Box flexDirection="column" flexGrow={1}>
       {approvalPrompt}
-      <Box flexDirection="row" flexWrap="wrap" flexGrow={1}>
-        {agents.map((agent, i) => (
-          <Box key={agent.id} flexGrow={1} minWidth={30}>
-            <AgentPane
-              entry={agent}
-              isFocused={i === focusIndex}
-              isExpanded={false}
-            />
-          </Box>
-        ))}
+      <Box flexGrow={1}>
+        {activeAgent ? (
+          <AgentPane entry={activeAgent} isFocused={true} isExpanded={true} />
+        ) : null}
       </Box>
-      <StatusBar agents={agents} />
+      {inputMode && activeAgent ? (
+        <InputBar agentName={activeAgent.name} onSubmit={handleInputSubmit} />
+      ) : null}
+      <StatusBar agents={agents} activeIndex={activeIndex} />
     </Box>
   );
 }

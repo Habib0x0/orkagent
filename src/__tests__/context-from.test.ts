@@ -233,7 +233,7 @@ describe('context_from system prompt injection', () => {
     await orc.start();
 
     expect(started).toBe(true);
-    expect(store.getAgent('solo')?.state).toBe('idle');
+    expect(store.getAgent('solo')?.state).toBe('done');
   });
 
   it('multiple context_from sources are combined into one system message', async () => {

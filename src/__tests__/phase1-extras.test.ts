@@ -250,9 +250,9 @@ describe('Store -- extra edge cases', () => {
 
   it('ring buffer at exactly 10,000 lines does not evict on that append', () => {
     store.initAgent('a1', 'coder');
-    // fill to exactly 9,999 then add one single-line to reach 10,000
+    // fill to exactly 9,999 lines using newlines, then add one more
     for (let i = 0; i < 9_999; i++) {
-      store.appendOutput('a1', `line ${i}`);
+      store.appendOutput('a1', `line ${i}\n`);
     }
     store.appendOutput('a1', 'exactly-ten-thousand');
     const buf = store.getAgent('a1')!.outputBuffer;

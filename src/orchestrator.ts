@@ -70,6 +70,7 @@ function createProvider(agentId: string, agentConfig: AgentConfig): AgentProvide
         apiKey: process.env['OPENAI_API_KEY'] ?? '',
         model,
         agentId,
+        baseURL: agentConfig.base_url,
       });
 
     case 'ollama':
@@ -328,7 +329,7 @@ export class Orchestrator {
       // pause the agent if it exceeds its own max_cost
       if (agentConfig.max_cost !== undefined && cost > agentConfig.max_cost) {
         const runner = this.runners.get(agentId);
-        if (runner && entry.state !== 'paused' && entry.state !== 'done') {
+        if (runner && entry.state !== 'paused') {
           runner.pause();
         }
       }
@@ -339,7 +340,7 @@ export class Orchestrator {
     if (sessionMaxCost !== undefined && sessionTotal > sessionMaxCost) {
       for (const [agentId, runner] of this.runners.entries()) {
         const entry = this.store.getAgent(agentId);
-        if (entry && entry.state !== 'paused' && entry.state !== 'done') {
+        if (entry && entry.state !== 'paused') {
           runner.pause();
         }
       }

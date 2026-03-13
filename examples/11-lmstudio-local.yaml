@@ -1,0 +1,36 @@
+version: 1
+
+# LM Studio local models via OpenAI-compatible API
+# Start LM Studio and load your models, then run:
+#   orkagent up -f examples/11-lmstudio-local.yaml
+
+agents:
+  planner:
+    provider: openai
+    model: qwen/qwen3.5-9b
+    base_url: http://localhost:1234/v1
+    system: |
+      You are a senior software architect. Given a feature request,
+      break it into clear implementation steps. Be specific about
+      files to create or modify, data structures, and edge cases.
+
+  coder:
+    provider: openai
+    model: qwen/qwen3-4b-2507
+    base_url: http://localhost:1234/v1
+    system: |
+      You are a focused code implementer. Given a plan, write clean
+      TypeScript code. Follow existing patterns in the codebase.
+      Keep functions small and well-named.
+    watches:
+      - planner
+    depends_on:
+      - planner
+    context_from:
+      - planner
+
+teams:
+  default:
+    agents:
+      - planner
+      - coder

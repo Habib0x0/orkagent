@@ -79,9 +79,9 @@ describe('AgentRunner', () => {
 
       await runner.start();
 
-      // after completion the final state should be idle
+      // after completion the final state should be done
       const entry = store.getAgent(AGENT_ID)!;
-      expect(entry.state).toBe('idle');
+      expect(entry.state).toBe('done');
       expect(entry.tokens.input).toBe(10);
     });
 
@@ -153,7 +153,7 @@ describe('AgentRunner', () => {
 
       // 3 retries means 4 total calls
       expect(provider.callCount).toBe(4);
-      expect(store.getAgent(AGENT_ID)?.state).toBe('idle');
+      expect(store.getAgent(AGENT_ID)?.state).toBe('done');
     });
 
     it('stops retrying after max_restarts and sets state to error', async () => {
@@ -191,7 +191,7 @@ describe('AgentRunner', () => {
       await runner.start();
 
       expect(provider.callCount).toBe(3);
-      expect(store.getAgent(AGENT_ID)?.state).toBe('idle');
+      expect(store.getAgent(AGENT_ID)?.state).toBe('done');
     });
 
     it('preserves conversation history across restarts', async () => {
@@ -260,7 +260,7 @@ describe('AgentRunner', () => {
       await runner.start();
 
       expect(calls).toBe(2);
-      expect(store.getAgent(AGENT_ID)?.state).toBe('idle');
+      expect(store.getAgent(AGENT_ID)?.state).toBe('done');
     }, 10_000);
 
     it('parses Retry-After from error message', () => {

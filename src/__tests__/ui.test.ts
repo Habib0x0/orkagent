@@ -27,51 +27,48 @@ afterEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// StatusBar
+// StatusBar (tmux-style tab bar)
 // ---------------------------------------------------------------------------
 describe('StatusBar', () => {
-  it('renders agent names with state labels', () => {
+  it('renders agent names with state indicators', () => {
     const agents: AgentStoreEntry[] = [
       makeEntry({ id: 'a1', name: 'coder', state: 'running' }),
       makeEntry({ id: 'a2', name: 'reviewer', state: 'idle' }),
       makeEntry({ id: 'a3', name: 'tester', state: 'done' }),
       makeEntry({ id: 'a4', name: 'broken', state: 'error' }),
     ];
-    const { lastFrame } = render(React.createElement(StatusBar, { agents }));
+    const { lastFrame } = render(React.createElement(StatusBar, { agents, activeIndex: 0 }));
     const frame = lastFrame() ?? '';
     expect(frame).toContain('coder');
-    expect(frame).toContain('[run]');
     expect(frame).toContain('reviewer');
-    expect(frame).toContain('[idle]');
     expect(frame).toContain('tester');
-    expect(frame).toContain('[done]');
     expect(frame).toContain('broken');
-    expect(frame).toContain('[err]');
   });
 
   it('renders cost formatted to 4 decimal places', () => {
     const agents: AgentStoreEntry[] = [
       makeEntry({ id: 'a1', name: 'coder', state: 'done', cost: 0.0123 }),
     ];
-    const { lastFrame } = render(React.createElement(StatusBar, { agents }));
+    const { lastFrame } = render(React.createElement(StatusBar, { agents, activeIndex: 0 }));
     const frame = lastFrame() ?? '';
     expect(frame).toContain('$0.0123');
   });
 
-  it('renders token counts with separators for large numbers', () => {
+  it('renders token counts in compact format', () => {
     const agents: AgentStoreEntry[] = [
       makeEntry({ id: 'a1', name: 'coder', state: 'done', tokens: { input: 1500, output: 3000 } }),
     ];
-    const { lastFrame } = render(React.createElement(StatusBar, { agents }));
+    const { lastFrame } = render(React.createElement(StatusBar, { agents, activeIndex: 0 }));
     const frame = lastFrame() ?? '';
-    expect(frame).toContain('1,500');
-    expect(frame).toContain('3,000');
+    expect(frame).toContain('1.5k');
+    expect(frame).toContain('3.0k');
   });
 
-  it('shows [wait] for paused state', () => {
+  it('shows paused state indicator', () => {
     const agents = [makeEntry({ id: 'a1', name: 'agent', state: 'paused' })];
-    const { lastFrame } = render(React.createElement(StatusBar, { agents }));
-    expect(lastFrame()).toContain('[wait]');
+    const { lastFrame } = render(React.createElement(StatusBar, { agents, activeIndex: 0 }));
+    const frame = lastFrame() ?? '';
+    expect(frame).toContain('agent');
   });
 });
 
@@ -87,13 +84,13 @@ describe('AgentPane', () => {
     expect(lastFrame()).toContain('myagent');
   });
 
-  it('shows state text label alongside name (color not conveyed alone)', () => {
+  it('shows state text label alongside name', () => {
     const states: Array<[AgentStoreEntry['state'], string]> = [
-      ['running', '[run]'],
-      ['idle', '[idle]'],
-      ['done', '[done]'],
-      ['error', '[err]'],
-      ['paused', '[wait]'],
+      ['running', 'running'],
+      ['idle', 'idle'],
+      ['done', 'done'],
+      ['error', 'error'],
+      ['paused', 'paused'],
     ];
     for (const [state, label] of states) {
       const entry = makeEntry({ state });
@@ -141,15 +138,11 @@ describe('InputBar', () => {
   });
 
   it('accepts onSubmit prop (contract check)', () => {
-    // useInput hooks rely on raw-mode stdin which the testing harness stubs out.
-    // We verify the component renders without error and the prop type is correct.
     const onSubmit = vi.fn();
     const { lastFrame } = render(
       React.createElement(InputBar, { agentName: 'coder', onSubmit }),
     );
-    // component renders the prompt
     expect(lastFrame()).toContain('[coder]');
-    // onSubmit is callable -- integration tested via App in real usage
     onSubmit('test');
     expect(onSubmit).toHaveBeenCalledWith('test');
   });
@@ -165,7 +158,7 @@ describe('InputBar', () => {
 });
 
 // ---------------------------------------------------------------------------
-// App -- grid and focused layout
+// App -- tmux-style layout
 // ---------------------------------------------------------------------------
 describe('App', () => {
   let store: Store;
@@ -182,7 +175,20 @@ describe('App', () => {
     store.destroy();
   });
 
-  it('renders 3 agent panes in grid layout', () => {
+  it('renders only the active agent pane (tmux-style)', () => {
+    const { lastFrame } = render(
+      React.createElement(App, {
+        store,
+        onRestart: vi.fn(),
+        onStop: vi.fn(),
+      }),
+    );
+    const frame = lastFrame() ?? '';
+    // first agent shown by default
+    expect(frame).toContain('coder');
+  });
+
+  it('shows all agents in the status bar', () => {
     const { lastFrame } = render(
       React.createElement(App, {
         store,
@@ -196,53 +202,25 @@ describe('App', () => {
     expect(frame).toContain('tester');
   });
 
-  it('renders a single pane when in focused layout', () => {
-    store.setFocusedAgent('a2');
-    vi.advanceTimersByTime(50); // flush the change event
-
-    const { lastFrame } = render(
-      React.createElement(App, {
-        store,
-        onRestart: vi.fn(),
-        onStop: vi.fn(),
-      }),
-    );
-    const frame = lastFrame() ?? '';
-    // The focused pane name should appear
-    expect(frame).toContain('reviewer');
-    // InputBar should be visible
-    expect(frame).toContain('[reviewer]');
-  });
-
-  it('hjkl keys move grid focus', () => {
-    const onRestart = vi.fn();
-    const onStop = vi.fn();
+  it('n key cycles to next agent', () => {
     const { stdin, lastFrame } = render(
-      React.createElement(App, { store, onRestart, onStop }),
+      React.createElement(App, { store, onRestart: vi.fn(), onStop: vi.fn() }),
     );
 
-    // should start focused on first agent (coder)
-    // press 'l' to move right -- focus should shift to reviewer
-    stdin.write('l');
-    // no crash and still renders
+    // press 'n' to move to next agent
+    stdin.write('n');
     const frame = lastFrame() ?? '';
     expect(frame).toContain('reviewer');
   });
 
-  it('renders focused layout when store is already in focused mode', () => {
-    // pre-set focused state -- no need for timer flush since we init store before render
-    store.setFocusedAgent('a1');
-    // manually flush the store state to avoid depending on the 50ms timer
-    // by reading initial state directly (store.getState() is the source of truth for App init)
-    const { lastFrame } = render(
-      React.createElement(App, {
-        store,
-        onRestart: vi.fn(),
-        onStop: vi.fn(),
-      }),
+  it('number keys jump to agent by index', () => {
+    const { stdin, lastFrame } = render(
+      React.createElement(App, { store, onRestart: vi.fn(), onStop: vi.fn() }),
     );
+
+    // press '3' to jump to third agent
+    stdin.write('3');
     const frame = lastFrame() ?? '';
-    // focused layout renders InputBar which shows [agentname] prompt
-    expect(frame).toContain('[coder]');
+    expect(frame).toContain('tester');
   });
 });

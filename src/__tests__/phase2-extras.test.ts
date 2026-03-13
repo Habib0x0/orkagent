@@ -455,7 +455,7 @@ describe('context_from -- empty output from source agent', () => {
     await orc.start();
 
     // consumer should have run
-    expect(store.getAgent('consumer')?.state).toBe('idle');
+    expect(store.getAgent('consumer')?.state).toBe('done');
     // no system message injected (nothing to inject from empty source)
     const systemMsg = captured.messages.find((m) => m.role === 'system');
     expect(systemMsg).toBeUndefined();

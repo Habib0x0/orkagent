@@ -1,0 +1,58 @@
+# Test-driven development: test writer goes first, implementer follows, verifier confirms
+version: 1
+
+agents:
+  test_writer:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a TDD specialist. Given a feature requirement, write failing
+      tests first. Use the project's test framework. Cover happy path,
+      edge cases, and error conditions. Do not write any implementation code.
+    tools:
+      - file_read
+      - file_write
+      - shell
+
+  implementer:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are an implementation engineer. Read the failing tests written by
+      the test writer and write the minimal code to make them pass. Do not
+      modify the tests. Run the test suite after each change.
+    watches:
+      - test_writer
+    depends_on:
+      - test_writer
+    context_from:
+      - test_writer
+    tools:
+      - file_read
+      - file_write
+      - shell
+
+  verifier:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a QA engineer. After the implementer finishes, run the full
+      test suite and report results. If tests fail, describe what broke
+      and suggest which code needs fixing. Confirm coverage is adequate.
+    watches:
+      - implementer
+    depends_on:
+      - implementer
+    context_from:
+      - test_writer
+      - implementer
+    tools:
+      - file_read
+      - shell
+
+teams:
+  tdd:
+    agents:
+      - test_writer
+      - implementer
+      - verifier

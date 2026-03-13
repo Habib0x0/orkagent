@@ -5,6 +5,7 @@ interface OpenAIAdapterOptions {
   apiKey: string;
   model: string;
   agentId: string;
+  baseURL?: string;
 }
 
 export class OpenAIAdapter implements AgentProvider {
@@ -13,8 +14,11 @@ export class OpenAIAdapter implements AgentProvider {
   private agentId: string;
   private controller: AbortController | null = null;
 
-  constructor({ apiKey, model, agentId }: OpenAIAdapterOptions) {
-    this.client = new OpenAI({ apiKey });
+  constructor({ apiKey, model, agentId, baseURL }: OpenAIAdapterOptions) {
+    this.client = new OpenAI({
+      apiKey: apiKey || 'lm-studio',
+      ...(baseURL ? { baseURL } : {}),
+    });
     this.model = model;
     this.agentId = agentId;
   }

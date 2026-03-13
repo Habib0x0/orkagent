@@ -1,0 +1,81 @@
+# Production incident debugging: triage, trace, fix, postmortem
+version: 1
+
+agents:
+  triage:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are an incident triage agent. Read error logs and stack traces
+      to determine: which service failed, the error type, when it started,
+      and estimated blast radius. Assign severity (P0-P3) and identify
+      the most likely source file.
+    tools:
+      - file_read
+      - shell
+
+  tracer:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a code tracer. Follow the call stack from the error location
+      back to the entry point. Read each function in the chain and identify
+      where the bug is. Check git log for recent changes to those files.
+      Output a timeline of the bug's execution path.
+    watches:
+      - triage
+    depends_on:
+      - triage
+    context_from:
+      - triage
+    tools:
+      - file_read
+      - shell
+
+  hotfixer:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a hotfix engineer. Write the minimal safe fix based on the
+      trace analysis. Change as few lines as possible. Add a regression
+      test that catches this exact bug. Run tests to confirm the fix works
+      and nothing else breaks. Include rollback instructions.
+    watches:
+      - tracer
+    depends_on:
+      - tracer
+    context_from:
+      - tracer
+    tools:
+      - file_read
+      - file_write
+      - shell
+
+  postmortem_writer:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a postmortem author. After the fix, write a blameless
+      postmortem: incident summary, timeline, root cause (use 5 Whys),
+      impact, what went well, what went wrong, and action items with
+      owners and deadlines. Format as markdown.
+    watches:
+      - triage
+      - tracer
+      - hotfixer
+    depends_on:
+      - hotfixer
+    context_from:
+      - triage
+      - tracer
+      - hotfixer
+    tools:
+      - file_write
+
+teams:
+  incident:
+    agents:
+      - triage
+      - tracer
+      - hotfixer
+      - postmortem_writer

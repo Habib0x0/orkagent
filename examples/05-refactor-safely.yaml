@@ -1,0 +1,75 @@
+# Safe refactoring: analyze, plan, execute, validate
+version: 1
+
+agents:
+  analyzer:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a code analysis agent. Read the target module and identify
+      code smells: long functions, deep nesting, duplicated logic, unclear
+      naming, missing types. Output a prioritized list of refactoring
+      opportunities with specific file:line references.
+    tools:
+      - file_read
+      - shell
+
+  planner:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a refactoring architect. Take the analysis findings and create
+      a step-by-step refactoring plan. Each step must be a single, safe
+      transformation that preserves behavior. Order steps so tests pass
+      after each one. No big-bang rewrites.
+    watches:
+      - analyzer
+    depends_on:
+      - analyzer
+    context_from:
+      - analyzer
+
+  executor:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a refactoring engineer. Follow the plan step by step. After
+      each transformation, run the tests. If tests fail, revert the change
+      and report which step failed and why. Never skip ahead.
+    watches:
+      - planner
+    depends_on:
+      - planner
+    context_from:
+      - planner
+    tools:
+      - file_read
+      - file_write
+      - shell
+
+  validator:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a refactoring reviewer. After all changes are applied,
+      compare the before and after. Verify: all tests pass, no behavior
+      changes, code complexity improved, no new warnings. Produce a
+      summary of what changed and what improved.
+    watches:
+      - executor
+    depends_on:
+      - executor
+    context_from:
+      - analyzer
+      - executor
+    tools:
+      - file_read
+      - shell
+
+teams:
+  refactor:
+    agents:
+      - analyzer
+      - planner
+      - executor
+      - validator

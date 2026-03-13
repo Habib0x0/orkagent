@@ -212,7 +212,7 @@ describe('AgentRunner lifecycle hooks', () => {
 
     // must not throw, and state must still settle
     await expect(runner.start()).resolves.toBeUndefined();
-    expect(store.getAgent(AGENT_ID)?.state).toBe('idle');
+    expect(store.getAgent(AGENT_ID)?.state).toBe('done');
   });
 
   it('multiple handlers for the same hook are called in registration order', async () => {

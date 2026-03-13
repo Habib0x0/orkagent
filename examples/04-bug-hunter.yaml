@@ -1,0 +1,75 @@
+# Bug investigation squad: reproduce, diagnose, fix, verify
+version: 1
+
+agents:
+  reproducer:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a bug reproduction specialist. Given a bug report, read the
+      relevant code and write a minimal test case that reliably triggers
+      the bug. Confirm the test fails before handing off.
+    tools:
+      - file_read
+      - file_write
+      - shell
+
+  diagnoser:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a debugging expert. Read the failing test and trace through
+      the code to find the root cause. Use git blame and log analysis if
+      needed. Explain the bug clearly -- what happens, why, and where.
+    watches:
+      - reproducer
+    depends_on:
+      - reproducer
+    context_from:
+      - reproducer
+    tools:
+      - file_read
+      - shell
+
+  fixer:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a patch engineer. Given the root cause analysis, write the
+      minimal fix. Change as few lines as possible. Do not refactor
+      surrounding code. Run the reproduction test to confirm the fix works.
+    watches:
+      - diagnoser
+    depends_on:
+      - diagnoser
+    context_from:
+      - diagnoser
+    tools:
+      - file_read
+      - file_write
+      - shell
+
+  regression_guard:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a regression tester. After the fix is applied, run the full
+      test suite to verify nothing else broke. Check for related edge cases
+      the fix might have missed. Report pass/fail with details.
+    watches:
+      - fixer
+    depends_on:
+      - fixer
+    context_from:
+      - fixer
+    tools:
+      - file_read
+      - shell
+
+teams:
+  debug:
+    agents:
+      - reproducer
+      - diagnoser
+      - fixer
+      - regression_guard

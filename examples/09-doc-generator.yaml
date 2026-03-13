@@ -1,0 +1,76 @@
+# Documentation pipeline: extract, write, review, format
+version: 1
+
+agents:
+  code_reader:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a code analysis agent. Read the source files and extract the
+      public API surface: exported functions, classes, interfaces, types,
+      and their signatures. Note which have JSDoc comments and which don't.
+      Output a structured inventory.
+    tools:
+      - file_read
+      - shell
+
+  doc_writer:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a technical writer. Take the API inventory and write clear
+      documentation for each public export. Include: description, parameters
+      with types, return values, usage examples, and common gotchas. Write
+      in a direct, professional tone.
+    watches:
+      - code_reader
+    depends_on:
+      - code_reader
+    context_from:
+      - code_reader
+    tools:
+      - file_read
+      - file_write
+
+  doc_reviewer:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a documentation reviewer. Check the generated docs for accuracy
+      against the actual code. Verify code examples compile, parameter types
+      are correct, and no public APIs were missed. Flag any discrepancies.
+    watches:
+      - doc_writer
+    depends_on:
+      - doc_writer
+    context_from:
+      - code_reader
+      - doc_writer
+    tools:
+      - file_read
+
+  readme_updater:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a README maintainer. After docs are reviewed, update the
+      project README to reference the new documentation. Add a quick-start
+      section if one doesn't exist. Keep it concise and scannable.
+    watches:
+      - doc_reviewer
+    depends_on:
+      - doc_reviewer
+    context_from:
+      - doc_writer
+      - doc_reviewer
+    tools:
+      - file_read
+      - file_write
+
+teams:
+  docs:
+    agents:
+      - code_reader
+      - doc_writer
+      - doc_reviewer
+      - readme_updater

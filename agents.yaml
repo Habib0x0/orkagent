@@ -1,0 +1,7 @@
+version: 1
+
+agents:
+  assistant:
+    provider: ollama
+    model: llama3.2
+    system: You are a helpful assistant.

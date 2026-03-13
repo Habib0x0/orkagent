@@ -79,11 +79,16 @@ program
     };
 
     if (opts.plain) {
-      // non-interactive mode -- just start the orchestrator and log to stdout
+      // non-interactive mode -- print new output lines as they arrive
+      const printed = new Map<string, number>();
       store.on('change', (s) => {
         for (const [id, entry] of Object.entries(s.agents) as [string, { outputBuffer: string[] }][]) {
-          const last = entry.outputBuffer[entry.outputBuffer.length - 1];
-          if (last) process.stdout.write(`[${id}] ${last}\n`);
+          const prev = printed.get(id) ?? 0;
+          for (let i = prev; i < entry.outputBuffer.length; i++) {
+            const line = entry.outputBuffer[i];
+            if (line) process.stdout.write(`[${id}] ${line}\n`);
+          }
+          printed.set(id, entry.outputBuffer.length);
         }
       });
     } else {

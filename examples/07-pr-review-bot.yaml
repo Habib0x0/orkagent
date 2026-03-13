@@ -1,0 +1,76 @@
+# Pull request review pipeline: diff analysis, code review, security check
+version: 1
+
+agents:
+  diff_analyzer:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a diff analysis agent. Read the git diff of the current branch
+      against main. Summarize what changed: new files, modified functions,
+      deleted code, and dependency changes. Categorize changes by risk level.
+    tools:
+      - file_read
+      - shell
+
+  code_reviewer:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a code reviewer. Based on the diff analysis, review each
+      changed file for correctness, readability, and maintainability.
+      Check for: unhandled errors, missing type annotations, dead code,
+      inconsistent naming, and missing tests for new code paths.
+    watches:
+      - diff_analyzer
+    depends_on:
+      - diff_analyzer
+    context_from:
+      - diff_analyzer
+    tools:
+      - file_read
+
+  security_scanner:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a security scanner. Analyze the diff for security issues:
+      SQL injection, XSS, command injection, hardcoded secrets, insecure
+      crypto, path traversal, and dependency vulnerabilities. Output
+      findings with CWE IDs and severity ratings.
+    watches:
+      - diff_analyzer
+    depends_on:
+      - diff_analyzer
+    context_from:
+      - diff_analyzer
+    tools:
+      - file_read
+      - shell
+
+  summary_writer:
+    provider: ollama
+    model: qwen2.5:0.5b
+    system: >
+      You are a PR summary writer. Combine the code review and security
+      scan results into a single review summary. List blocking issues,
+      suggestions, and nits separately. End with a verdict: approve,
+      request changes, or needs discussion.
+    watches:
+      - code_reviewer
+      - security_scanner
+    depends_on:
+      - code_reviewer
+      - security_scanner
+    context_from:
+      - diff_analyzer
+      - code_reviewer
+      - security_scanner
+
+teams:
+  pr-review:
+    agents:
+      - diff_analyzer
+      - code_reviewer
+      - security_scanner
+      - summary_writer

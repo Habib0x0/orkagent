@@ -29,7 +29,10 @@ export interface AppState {
 }
 
 const OUTPUT_BUFFER_MAX = 10_000;
-const BATCH_INTERVAL_MS = 50;
+const BATCH_INTERVAL_MS = 16; // ~60fps for smooth streaming
+
+// track per-agent state for filtering think blocks
+const thinkState = new Map<string, boolean>();
 
 export class Store extends EventEmitter {
   private state: AppState = {
@@ -88,10 +91,28 @@ export class Store extends EventEmitter {
   appendOutput(id: string, text: string): void {
     const entry = this.state.agents[id];
     if (!entry) return;
-    const lines = text.split('\n');
-    for (const line of lines) {
-      entry.outputBuffer.push(line);
+
+    // filter out <think>...</think> blocks (Qwen, DeepSeek, etc.)
+    const filtered = filterThinkBlocks(id, text);
+    if (!filtered) return;
+
+    // streaming tokens arrive as small chunks -- accumulate into the
+    // current line and only start a new line on actual '\n' characters
+    const parts = filtered.split('\n');
+    for (let i = 0; i < parts.length; i++) {
+      if (i === 0) {
+        // append to the current (last) line, or start the first one
+        if (entry.outputBuffer.length === 0) {
+          entry.outputBuffer.push(parts[i]!);
+        } else {
+          entry.outputBuffer[entry.outputBuffer.length - 1] += parts[i];
+        }
+      } else {
+        // each subsequent part starts a new line
+        entry.outputBuffer.push(parts[i]!);
+      }
     }
+
     // evict oldest lines if over the cap
     if (entry.outputBuffer.length > OUTPUT_BUFFER_MAX) {
       entry.outputBuffer.splice(0, entry.outputBuffer.length - OUTPUT_BUFFER_MAX);
@@ -166,4 +187,36 @@ export class Store extends EventEmitter {
   getState(): Readonly<AppState> {
     return this.state;
   }
+}
+
+// filter <think>...</think> blocks that models like Qwen3 and DeepSeek emit
+// works on streaming chunks -- tracks open/close state per agent
+function filterThinkBlocks(agentId: string, text: string): string {
+  let inThink = thinkState.get(agentId) ?? false;
+  let result = '';
+  let i = 0;
+
+  while (i < text.length) {
+    if (!inThink) {
+      const openIdx = text.indexOf('<think>', i);
+      if (openIdx === -1) {
+        result += text.slice(i);
+        break;
+      }
+      result += text.slice(i, openIdx);
+      inThink = true;
+      i = openIdx + 7; // skip past '<think>'
+    } else {
+      const closeIdx = text.indexOf('</think>', i);
+      if (closeIdx === -1) {
+        // still inside think block, discard rest
+        break;
+      }
+      inThink = false;
+      i = closeIdx + 9; // skip past '</think>'
+    }
+  }
+
+  thinkState.set(agentId, inThink);
+  return result;
 }
