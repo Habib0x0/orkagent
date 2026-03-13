@@ -21,6 +21,10 @@
 
 ---
 
+> **Early Development Notice:** orkagent is in active early development and may not work as intended. APIs, config format, and features may change. Use at your own risk and report issues on GitHub.
+
+---
+
 Your AI agents are scattered across terminal tabs. You copy-paste between them, lose context, forget what each one is doing. Orkagent fixes that.
 
 It launches multiple LLM agents from a single YAML file, renders them in a tmux-style terminal UI (one agent full-screen, cycle between them), lets them watch each other, share context, and use tools -- all with per-agent permissions and cost guardrails. Mix Claude, GPT, and Ollama in the same team.
@@ -365,6 +369,41 @@ Orkagent tracks token usage and estimated cost per agent in real time, displayed
 | Ollama (local) | Free | Free |
 
 Set `max_cost` per agent or per session. Agents auto-pause when limits are hit.
+
+---
+
+## Local LLMs
+
+orkagent supports local models out of the box. Run your agents entirely offline or mix local and cloud models in the same team.
+
+### Ollama
+
+Make sure [Ollama](https://ollama.com) is running locally, then use it in your config:
+
+```yaml
+agents:
+  researcher:
+    provider: ollama
+    model: llama3.2
+    system: You are a research assistant.
+```
+
+Any model available in your Ollama instance works -- `llama3.2`, `mistral`, `codellama`, `deepseek-coder`, etc.
+
+### LM Studio
+
+[LM Studio](https://lmstudio.ai) exposes an OpenAI-compatible API. Point orkagent at it using the `openai` provider with a custom base URL:
+
+```yaml
+agents:
+  local-coder:
+    provider: openai
+    model: local-model
+    base_url: http://localhost:1234/v1
+    system: You are a coding assistant.
+```
+
+This works with any OpenAI-compatible local server (LM Studio, LocalAI, vLLM, text-generation-webui, etc).
 
 ---
 
